@@ -5,7 +5,7 @@ import ctypes.wintypes
 import os
 import subprocess
 
-from tracker.config.tracker_settings import tracker_settings
+from devpulse_client.config.tracker_config import tracker_settings
 
 
 class ScreenLockDetector:

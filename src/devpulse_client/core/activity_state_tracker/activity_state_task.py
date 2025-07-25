@@ -5,9 +5,9 @@ from datetime import datetime
 
 from loguru import logger
 
-from tracker.config.tracker_settings import tracker_settings
-from tracker.db.event_store import EventStore
-from tracker.tables.activity_table import ActivityEventType
+from devpulse_client.config.tracker_config import tracker_settings
+from devpulse_client.queue.event_store import EventStore
+from devpulse_client.tables.activity_table import ActivityEventType
 
 from .idle_detector import IdleDetector
 from .screen_lock_detector import ScreenLockDetector
