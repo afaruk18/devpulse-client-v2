@@ -1,8 +1,8 @@
-from tracker.core.activity_state_tracker import ActivityStateTask, IdleDetector, ScreenLockDetector
-from tracker.db.event_store import EventStore
-from tracker.core.heartbeat import HeartbeatTask
-from tracker.core.screenshot_tracker import ScreenshotCapturer, ScreenshotTask
-from tracker.core.window_tracker import WindowTitleProvider, WindowTrackerTask
+from .activity_state_tracker import ActivityStateTask, IdleDetector, ScreenLockDetector
+from devpulse_client.queue.event_store import EventStore
+from .heartbeat import HeartbeatTask
+from .screenshot_tracker import ScreenshotCapturer, ScreenshotTask
+from .window_tracker import WindowTitleProvider, WindowTrackerTask
 
 __all__ = [
     "EventStore",

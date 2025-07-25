@@ -3,10 +3,10 @@ from datetime import datetime
 
 from loguru import logger
 
-from tracker.config.tracker_settings import tracker_settings
-from tracker.core import ActivityStateTask, HeartbeatTask, ScreenshotCapturer, WindowTrackerTask
-from tracker.db.event_store import EventStore
-from tracker.tables.activity_table import ActivityEventType
+from devpulse_client.config.tracker_config import tracker_settings
+from devpulse_client.core import ActivityStateTask, HeartbeatTask, ScreenshotCapturer, WindowTrackerTask
+from devpulse_client.queue.event_store import EventStore
+from devpulse_client.tables.activity_table import ActivityEventType
 
 class ActivityTracker:
     """Tracks idle/lock state and captures screenshots, persisting everything to Postgres."""

@@ -6,7 +6,7 @@ from pathlib import Path
 import mss
 from PIL import Image
 
-from tracker.config.tracker_settings import tracker_settings
+from devpulse_client.config.tracker_config import tracker_settings
 
 
 class ScreenshotCapturer:

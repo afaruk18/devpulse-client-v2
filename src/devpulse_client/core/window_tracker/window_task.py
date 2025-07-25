@@ -5,7 +5,7 @@ from datetime import datetime
 
 from loguru import logger
 
-from tracker.db.event_store import EventStore
+from devpulse_client.queue.event_store import EventStore
 
 from .window_title_provider import WindowTitleProvider
 

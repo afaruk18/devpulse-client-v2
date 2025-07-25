@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from tracker.db.event_store import EventStore
+from devpulse_client.queue.event_store import EventStore
 
 
 @dataclass
