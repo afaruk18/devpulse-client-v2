@@ -38,6 +38,12 @@ class CaptchaTask:
             self._last_challenge = now
             self._run_captcha_challenge_async()
 
+    def _log_captcha_event(self, expression: str, user_answer: int, correct_answer: int, is_correct: bool, creation_time: datetime, answer_time: datetime, response_time_ms: int) -> None:
+        # Log captcha created event
+        EventStore.log_captcha_created(expression, correct_answer, timestamp=creation_time)
+        # Log captcha answered event
+        EventStore.log_captcha_answered(expression, user_answer, correct_answer, is_correct, timestamp=answer_time)
+
     def _run_captcha_challenge_async(self) -> None:
         """Run a single captcha challenge asynchronously."""
         if self._loop is None:
