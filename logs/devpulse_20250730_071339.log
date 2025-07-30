@@ -1,0 +1,7 @@
+2025-07-30 07:13:39 | INFO     | devpulse_client.auth.collectors.device_collector:collect_fingerprint:20 - Collecting device fingerprint
+2025-07-30 07:13:39 | INFO     | devpulse_client.auth.collectors.device_collector:collect_fingerprint:23 - Collecting device fingerprint: 82:2b:38:3d:bc:d0
+2025-07-30 07:13:39 | INFO     | devpulse_client.auth.collectors.device_collector:collect_fingerprint:26 - Collecting device fingerprint: OKEY
+2025-07-30 07:13:39 | DEBUG    | devpulse_client.auth.collectors.device_collector:collect_fingerprint:29 - Collected device fingerprint: MAC=82:2b:38:3d:bc:d0
+2025-07-30 07:13:39 | ERROR    | devpulse_client.auth.client.auth_client:_send_login_request:153 - Network error: [Errno 111] Connection refused
+2025-07-30 07:13:39 | ERROR    | devpulse_client.auth.client.auth_client:login:133 - Credential validation error: [Errno 111] Connection refused
+2025-07-30 07:13:39 | ERROR    | devpulse_client.app.app:start:33 - ❌ Login failed for user test
