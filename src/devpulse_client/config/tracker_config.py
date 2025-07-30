@@ -16,6 +16,8 @@ class TrackerSettings(BaseSettings):
     IMAGE_QUALITY: int = Field(85, description="JPEG quality when IMAGE_FORMAT == 'jpeg'")
     WINDOW_EVENT_INTERVAL: int = Field(0, description="seconds a window must remain active before it is logged")
     SYSTEM_RUN_DELAY: float = Field(0.1, description="seconds to wait after running tasks again")
+    CAPTCHA_INTERVAL: int = Field(10, description="seconds between captcha challenges (0 = disabled)")
+    CAPTCHA_INFO_TIMEOUT: int = Field(3, description="seconds to show captcha success dialog")
 
     # File logging settings
 
