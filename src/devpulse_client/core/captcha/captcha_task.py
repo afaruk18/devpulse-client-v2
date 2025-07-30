@@ -48,6 +48,17 @@ class CaptchaTask:
         self._running = False
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._task: Optional[asyncio.Task] = None
+        self._captcha_thread: Optional[threading.Thread] = None
+
+    @property
+    def _loop(self) -> Optional[asyncio.AbstractEventLoop]:
+        """Safely access the event loop."""
+        return getattr(self, '_loop_attr', None)
+    
+    @_loop.setter
+    def _loop(self, value: Optional[asyncio.AbstractEventLoop]) -> None:
+        """Safely set the event loop."""
+        self._loop_attr = value
 
     def tick(self, now: float) -> None:
         """
@@ -75,9 +86,9 @@ class CaptchaTask:
                     loop.close()
                     self._loop = None
             
-            thread = threading.Thread(target=run_async_captcha)
-            thread.daemon = True
-            thread.start()
+            self._captcha_thread = threading.Thread(target=run_async_captcha)
+            self._captcha_thread.daemon = True
+            self._captcha_thread.start()
         else:
             # Schedule the coroutine in the existing loop
             if self._task is None or self._task.done():
@@ -225,3 +236,15 @@ class CaptchaTask:
         self._running = False
         if self._task and not self._task.done():
             self._task.cancel()
+        if self._captcha_thread and self._captcha_thread.is_alive():
+            # Note: We can't easily stop the thread, but it will clean up when the loop closes
+            pass
+
+    def __getstate__(self):
+        """Handle serialization by excluding async-related attributes."""
+        state = self.__dict__.copy()
+        # Remove async-related attributes that can't be serialized
+        state.pop('_loop_attr', None)
+        state.pop('_task', None)
+        state.pop('_captcha_thread', None)
+        return state
