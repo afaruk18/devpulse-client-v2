@@ -3,6 +3,8 @@ from __future__ import annotations
 import random
 import subprocess
 import shlex
+import asyncio
+import threading
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
@@ -18,7 +20,9 @@ class CaptchaEvent:
     user_answer: int
     correct_answer: int
     is_correct: bool
-    timestamp: datetime
+    creation_time: datetime
+    answer_time: datetime
+    response_time_ms: int
 
 
 class CaptchaTask:
@@ -27,7 +31,7 @@ class CaptchaTask:
     
     This class manages periodic math challenges using zenity dialogs.
     It sends captcha events to the EventStore instead of logging to CSV.
-    The task runs in a separate thread to avoid blocking other functionality.
+    The task runs asynchronously to avoid blocking other functionality.
     """
 
     def __init__(self, interval: int = 10, info_timeout: int = 3):
@@ -42,6 +46,8 @@ class CaptchaTask:
         self.info_timeout = info_timeout
         self._last_challenge: Optional[float] = None
         self._running = False
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._task: Optional[asyncio.Task] = None
 
     def tick(self, now: float) -> None:
         """
@@ -52,15 +58,35 @@ class CaptchaTask:
         """
         if self._last_challenge is None or now - self._last_challenge >= self.interval:
             self._last_challenge = now
-            # Run the captcha challenge in a separate thread to avoid blocking
-            import threading
-            if not hasattr(self, '_captcha_thread') or not self._captcha_thread.is_alive():
-                self._captcha_thread = threading.Thread(target=self._run_captcha_challenge_sync)
-                self._captcha_thread.daemon = True
-                self._captcha_thread.start()
+            # Run the captcha challenge asynchronously
+            self._run_captcha_challenge_async()
 
-    def _run_captcha_challenge_sync(self) -> None:
-        """Run a single captcha challenge synchronously in a separate thread."""
+    def _run_captcha_challenge_async(self) -> None:
+        """Run a single captcha challenge asynchronously."""
+        if self._loop is None:
+            # Create event loop in a separate thread if not exists
+            def run_async_captcha():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                self._loop = loop
+                try:
+                    loop.run_until_complete(self._captcha_challenge_coroutine())
+                finally:
+                    loop.close()
+                    self._loop = None
+            
+            thread = threading.Thread(target=run_async_captcha)
+            thread.daemon = True
+            thread.start()
+        else:
+            # Schedule the coroutine in the existing loop
+            if self._task is None or self._task.done():
+                self._task = asyncio.run_coroutine_threadsafe(
+                    self._captcha_challenge_coroutine(), self._loop
+                )
+
+    async def _captcha_challenge_coroutine(self) -> None:
+        """Async coroutine for running a captcha challenge."""
         try:
             # Generate math problem
             a = random.randint(1, 20)
@@ -68,33 +94,39 @@ class CaptchaTask:
             op = random.choice(['+', '-'])
             expr = f"{a} {op} {b}"
             correct_answer = eval(expr)
+            
+            # Record creation time
+            creation_time = datetime.now()
 
-            # Show dialog and get user input
-            user_answer = self._show_math_dialog_sync(expr)
+            # Show dialog and get user input asynchronously
+            user_answer = await self._show_math_dialog_async(expr)
             
             if user_answer is None:
                 # User cancelled, don't log anything
                 return
 
+            # Record answer time
+            answer_time = datetime.now()
+            response_time_ms = int((answer_time - creation_time).total_seconds() * 1000)
+
             is_correct = (user_answer == correct_answer)
             
-            # Log the captcha event
-            self._log_captcha_event(expr, user_answer, correct_answer, is_correct)
+            # Log the captcha event with timing information
+            self._log_captcha_event(expr, user_answer, correct_answer, is_correct, 
+                                  creation_time, answer_time, response_time_ms)
 
             if is_correct:
-                self._show_success_dialog_sync()
+                await self._show_success_dialog_async()
             else:
-                self._show_error_dialog_sync()
+                await self._show_error_dialog_async()
 
         except Exception as e:
             # Log error but don't crash the application
             print(f"Captcha challenge error: {e}")
 
-
-
-    def _show_math_dialog_sync(self, expression: str) -> Optional[int]:
+    async def _show_math_dialog_async(self, expression: str) -> Optional[int]:
         """
-        Show math challenge dialog and get user input (synchronous version).
+        Show math challenge dialog and get user input (asynchronous version).
         
         Args:
             expression: Math expression to solve
@@ -105,12 +137,13 @@ class CaptchaTask:
         cmd = f"zenity --entry --title='Math Challenge' --text='Solve: {expression} = ?'"
         
         try:
-            proc = subprocess.Popen(
-                shlex.split(cmd),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL
+            # Run subprocess asynchronously
+            proc = await asyncio.create_subprocess_exec(
+                *shlex.split(cmd),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL
             )
-            stdout, _ = proc.communicate()
+            stdout, _ = await proc.communicate()
             
             if proc.returncode != 0:
                 return None  # User cancelled
@@ -118,61 +151,66 @@ class CaptchaTask:
             try:
                 return int(stdout.decode().strip())
             except ValueError:
-                self._show_invalid_input_dialog_sync()
+                await self._show_invalid_input_dialog_async()
                 return None
                 
         except Exception:
             return None
 
-
-
-    def _show_success_dialog_sync(self) -> None:
-        """Show success dialog (synchronous version)."""
+    async def _show_success_dialog_async(self) -> None:
+        """Show success dialog (asynchronous version)."""
         cmd = f"zenity --info --timeout={self.info_timeout} --text='Correct! Next challenge soon.'"
         try:
-            subprocess.call(shlex.split(cmd))
+            proc = await asyncio.create_subprocess_exec(*shlex.split(cmd))
+            await proc.communicate()
         except Exception:
             pass  # Ignore dialog errors
 
-    def _show_error_dialog_sync(self) -> None:
-        """Show error dialog (synchronous version)."""
+    async def _show_error_dialog_async(self) -> None:
+        """Show error dialog (asynchronous version)."""
         cmd = "zenity --warning --text='Incorrect! Try again.'"
         try:
-            subprocess.call(shlex.split(cmd))
+            proc = await asyncio.create_subprocess_exec(*shlex.split(cmd))
+            await proc.communicate()
         except Exception:
             pass  # Ignore dialog errors
 
-    def _show_invalid_input_dialog_sync(self) -> None:
-        """Show invalid input dialog (synchronous version)."""
+    async def _show_invalid_input_dialog_async(self) -> None:
+        """Show invalid input dialog (asynchronous version)."""
         cmd = "zenity --error --title='Invalid Input' --text='Please enter a valid integer.'"
         try:
-            subprocess.call(shlex.split(cmd))
+            proc = await asyncio.create_subprocess_exec(*shlex.split(cmd))
+            await proc.communicate()
         except Exception:
             pass  # Ignore dialog errors
 
-
-
-    def _log_captcha_event(self, expression: str, user_answer: int, correct_answer: int, is_correct: bool) -> None:
+    def _log_captcha_event(self, expression: str, user_answer: int, correct_answer: int, 
+                          is_correct: bool, creation_time: datetime, answer_time: datetime, 
+                          response_time_ms: int) -> None:
         """
-        Log captcha event to the EventStore.
+        Log captcha event to the EventStore with timing information.
         
         Args:
             expression: Math expression that was presented
             user_answer: User's answer
             correct_answer: Correct answer
             is_correct: Whether user's answer was correct
+            creation_time: When the captcha was created
+            answer_time: When the user answered
+            response_time_ms: Response time in milliseconds
         """
-        timestamp = datetime.now()
-        
-        # Create captcha event data
+        # Create captcha event data with timing information
         event_data = {
             "username": tracker_settings.user,
-            "timestamp": timestamp,
+            "timestamp": creation_time,  # Use creation time as primary timestamp
             "event": "captcha_challenge",
             "expression": expression,
             "user_answer": user_answer,
             "correct_answer": correct_answer,
-            "is_correct": is_correct
+            "is_correct": is_correct,
+            "creation_time": creation_time,
+            "answer_time": answer_time,
+            "response_time_ms": response_time_ms
         }
         
         # Add to event store
@@ -185,3 +223,5 @@ class CaptchaTask:
     def stop(self) -> None:
         """Stop the captcha task."""
         self._running = False
+        if self._task and not self._task.done():
+            self._task.cancel()
