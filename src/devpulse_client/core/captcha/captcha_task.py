@@ -31,10 +31,18 @@ class CaptchaTask:
         self.info_timeout = info_timeout
         self._last_challenge: Optional[float] = None
         self._running = True
+        self._last_expr = None
+        self._last_correct_answer = None
+        self._last_answered = True
+        self._loop = None
+        self._task = None
 
     def tick(self, now: float) -> None:
       
         if self._last_challenge is None or now - self._last_challenge >= self.interval:
+            # If previous captcha was not answered, log event
+            if self._last_expr is not None and not self._last_answered:
+                EventStore.log_captcha_not_answered(self._last_expr, self._last_correct_answer)
             self._last_challenge = now
             self._run_captcha_challenge_async()
 
@@ -64,42 +72,39 @@ class CaptchaTask:
     
     
     async def _captcha_challenge_coroutine(self) -> None:
-        """Async coroutine for running a captcha challenge."""
-        
-        try:
-            # Generate math problem
-            a = random.randint(1, 20)
-            b = random.randint(1, 20)
-            op = random.choice(['+', '-'])
-            expr = f"{a} {op} {b}"
-            correct_answer = eval(expr)
-
-            # Show dialog and get user input
-            creation_time = datetime.now()
-
-            # Show dialog and get user input asynchronously
-            user_answer = await self._show_math_dialog_async(expr)
-            
-            if user_answer is None:
-                # User cancelled, don't log anything
-                return
-            answer_time = datetime.now()
-            response_time_ms = int((answer_time - creation_time).total_seconds() * 1000)
-            
-            is_correct = (user_answer == correct_answer)
-            
-            
-            self._log_captcha_event(expr, user_answer, correct_answer, is_correct, 
-                                  creation_time, answer_time, response_time_ms)
-
-            if is_correct:
-                await self._show_success_dialog_async()
-            else:
-                await self._show_error_dialog_async()
-
-        except Exception as e:
-            
-            print(f"Captcha challenge error: {e}")
+        while True:
+            try:
+                # Generate math problem
+                a = random.randint(1, 20)
+                b = random.randint(1, 20)
+                op = random.choice(['+', '-'])
+                expr = f"{a} {op} {b}"
+                correct_answer = eval(expr)
+                self._last_expr = expr
+                self._last_correct_answer = correct_answer
+                self._last_answered = False
+                # Show dialog and get user input
+                creation_time = datetime.now()
+                user_answer = await self._show_math_dialog_async(expr)
+                if user_answer is None:
+                    # User cancelled, don't log anything (handled in tick for not answered)
+                    return
+                answer_time = datetime.now()
+                response_time_ms = int((answer_time - creation_time).total_seconds() * 1000)
+                is_correct = (user_answer == correct_answer)
+                self._log_captcha_event(expr, user_answer, correct_answer, is_correct, creation_time, answer_time, response_time_ms)
+                self._last_answered = True
+                if is_correct:
+                    await self._show_success_dialog_async()
+                    break
+                else:
+                    # Log wrong answer event and re-ask immediately
+                    EventStore.log_wrong_captcha_answer(expr, user_answer, correct_answer)
+                    await self._show_error_dialog_async()
+                    # Loop again to re-ask the same question
+            except Exception as e:
+                print(f"Captcha challenge error: {e}")
+                break
 
 
 
