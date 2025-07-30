@@ -33,10 +33,39 @@ class _WindowEvent:
     end_time: datetime | None
 
 
+@dataclass()
+class _CaptchaCreatedEvent:
+    username: str
+    timestamp: datetime
+    event: str
+    expression: str
+    correct_answer: int
+
+
+@dataclass()
+class _CaptchaAnsweredEvent:
+    username: str
+    timestamp: datetime
+    event: str
+    expression: str
+    user_answer: int
+    correct_answer: int
+    is_correct: bool
+
+
+@dataclass()
+class _CaptchaCancelledEvent:
+    username: str
+    timestamp: datetime
+    event: str
+    expression: str
+    correct_answer: int
+
+
 
 class EventStore:
     
-    _events: Deque[_ActivityEvent | _HeartbeatEvent | _WindowEvent] = deque() 
+    _events: Deque[_ActivityEvent | _HeartbeatEvent | _WindowEvent | _CaptchaCreatedEvent | _CaptchaAnsweredEvent | _CaptchaCancelledEvent] = deque() 
     
 
     @staticmethod
@@ -102,6 +131,50 @@ class EventStore:
                 duration=actual_duration,
                 start_time=actual_start_time,
                 end_time=actual_end_time,
+            )
+        )
+
+    @staticmethod
+    def log_captcha_created(expression: str, correct_answer: int, timestamp: datetime | None = None) -> None:
+        """Log a captcha creation event."""
+        ts = timestamp or datetime.now()
+        EventStore._push(
+            _CaptchaCreatedEvent(
+                username=tracker_settings.user,
+                timestamp=ts,
+                event="captcha_created",
+                expression=expression,
+                correct_answer=correct_answer,
+            )
+        )
+
+    @staticmethod
+    def log_captcha_answered(expression: str, user_answer: int, correct_answer: int, is_correct: bool, timestamp: datetime | None = None) -> None:
+        """Log a captcha answer event."""
+        ts = timestamp or datetime.now()
+        EventStore._push(
+            _CaptchaAnsweredEvent(
+                username=tracker_settings.user,
+                timestamp=ts,
+                event="captcha_answered",
+                expression=expression,
+                user_answer=user_answer,
+                correct_answer=correct_answer,
+                is_correct=is_correct,
+            )
+        )
+
+    @staticmethod
+    def log_captcha_cancelled(expression: str, correct_answer: int, timestamp: datetime | None = None) -> None:
+        """Log a captcha cancellation event."""
+        ts = timestamp or datetime.now()
+        EventStore._push(
+            _CaptchaCancelledEvent(
+                username=tracker_settings.user,
+                timestamp=ts,
+                event="captcha_cancelled",
+                expression=expression,
+                correct_answer=correct_answer,
             )
         )
      # ------------------------------------------------------------------

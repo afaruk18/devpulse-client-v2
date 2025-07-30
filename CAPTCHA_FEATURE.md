@@ -29,17 +29,40 @@ CAPTCHA_INFO_TIMEOUT: int = Field(3, description="seconds to show captcha succes
 
 ## Event Structure
 
-Captcha events are logged to the EventStore with the following structure:
+Captcha events are logged to the EventStore with three different event types:
 
+### 1. Captcha Creation Event
 ```python
 {
     "username": "user",
     "timestamp": datetime,
-    "event": "captcha_challenge",
+    "event": "captcha_created",
+    "expression": "5 + 3",
+    "correct_answer": 8
+}
+```
+
+### 2. Captcha Answer Event
+```python
+{
+    "username": "user",
+    "timestamp": datetime,
+    "event": "captcha_answered",
     "expression": "5 + 3",
     "user_answer": 8,
     "correct_answer": 8,
     "is_correct": True
+}
+```
+
+### 3. Captcha Cancellation Event
+```python
+{
+    "username": "user",
+    "timestamp": datetime,
+    "event": "captcha_cancelled",
+    "expression": "5 + 3",
+    "correct_answer": 8
 }
 ```
 
@@ -70,11 +93,12 @@ The captcha feature is automatically enabled when `CAPTCHA_INTERVAL > 0`. Users 
 
 ### User Experience
 
-1. **Challenge Dialog**: A zenity entry dialog appears with a math problem
-2. **User Input**: User enters their answer and clicks OK
-3. **Validation**: System checks if the answer is correct
-4. **Feedback**: Success or error dialog is shown
-5. **Logging**: Event is logged to the EventStore for later transmission
+1. **Captcha Creation**: Math problem is generated and logged as `captcha_created` event
+2. **Challenge Dialog**: A zenity entry dialog appears with a math problem
+3. **User Input**: User enters their answer and clicks OK
+4. **Validation**: System checks if the answer is correct
+5. **Feedback**: Success or error dialog is shown
+6. **Logging**: Answer is logged as `captcha_answered` event, or `captcha_cancelled` if user cancels
 
 ## Technical Implementation
 
@@ -135,3 +159,5 @@ The original implementation logged to CSV files. This new implementation:
 4. ✅ Configurable through settings
 5. ✅ Non-blocking operation
 6. ✅ Better error handling
+7. ✅ **Dual Event Tracking**: Logs both creation and answer times
+8. ✅ **Cancellation Tracking**: Tracks when users cancel captcha challenges

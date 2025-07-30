@@ -69,17 +69,21 @@ class CaptchaTask:
             expr = f"{a} {op} {b}"
             correct_answer = eval(expr)
 
+            # Log the captcha creation event
+            self._log_captcha_created_event(expr, correct_answer)
+
             # Show dialog and get user input
             user_answer = self._show_math_dialog_sync(expr)
             
             if user_answer is None:
-                # User cancelled, don't log anything
+                # User cancelled, log the cancellation
+                self._log_captcha_cancelled_event(expr, correct_answer)
                 return
 
             is_correct = (user_answer == correct_answer)
             
-            # Log the captcha event
-            self._log_captcha_event(expr, user_answer, correct_answer, is_correct)
+            # Log the captcha answer event
+            self._log_captcha_answered_event(expr, user_answer, correct_answer, is_correct)
 
             if is_correct:
                 self._show_success_dialog_sync()
@@ -152,9 +156,41 @@ class CaptchaTask:
 
 
 
+    def _log_captcha_created_event(self, expression: str, correct_answer: int) -> None:
+        """
+        Log captcha creation event to the EventStore.
+        
+        Args:
+            expression: Math expression that was presented
+            correct_answer: Correct answer
+        """
+        EventStore.log_captcha_created(expression, correct_answer)
+
+    def _log_captcha_answered_event(self, expression: str, user_answer: int, correct_answer: int, is_correct: bool) -> None:
+        """
+        Log captcha answer event to the EventStore.
+        
+        Args:
+            expression: Math expression that was presented
+            user_answer: User's answer
+            correct_answer: Correct answer
+            is_correct: Whether user's answer was correct
+        """
+        EventStore.log_captcha_answered(expression, user_answer, correct_answer, is_correct)
+
+    def _log_captcha_cancelled_event(self, expression: str, correct_answer: int) -> None:
+        """
+        Log captcha cancellation event to the EventStore.
+        
+        Args:
+            expression: Math expression that was presented
+            correct_answer: Correct answer
+        """
+        EventStore.log_captcha_cancelled(expression, correct_answer)
+
     def _log_captcha_event(self, expression: str, user_answer: int, correct_answer: int, is_correct: bool) -> None:
         """
-        Log captcha event to the EventStore.
+        Log captcha event to the EventStore (legacy method for backward compatibility).
         
         Args:
             expression: Math expression that was presented
