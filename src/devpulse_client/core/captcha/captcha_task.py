@@ -39,13 +39,16 @@ class CaptchaTask:
           
         
     def tick(self, now: float) -> None:
-      
+        # If a new captcha is due, close any running challenge, log not answered, and start a new one
         if self._last_challenge is None or now - self._last_challenge >= self.interval:
-            
             if self._last_expr is not None and not self._last_answered:
                 EventStore.log_captcha_not_answered(self._last_expr, self._last_correct_answer)
-            
             self._last_challenge = now
+            # Stop any running challenge before starting a new one
+            if self._task is not None and not self._task.done():
+                # There is a running challenge, cancel it
+                self._task.cancel()
+                self._task = None
             self._run_captcha_challenge_async()
     
     def _log_captcha_event(self, expression: str, user_answer: int, correct_answer: int, is_correct: bool, creation_time: datetime, answer_time: datetime, response_time_ms: int) -> None:
@@ -80,7 +83,6 @@ class CaptchaTask:
     
     
     async def _captcha_challenge_coroutine(self) -> None:
-        
         while True:
             try:
                 # Generate math problem
@@ -94,10 +96,13 @@ class CaptchaTask:
                 self._last_answered = False
                 # Show dialog and get user input
                 creation_time = datetime.now()
-                user_answer = await self._show_math_dialog_async(expr)
-                if user_answer is None:
-                    # User cancelled, don't log anything (handled in tick for not answered)
-                    return
+                while True:
+                    user_answer = await self._show_math_dialog_async(expr)
+                    if user_answer is None:
+                        # User clicked cancel, re-ask the same question
+                        continue
+                    else:
+                        break
                 answer_time = datetime.now()
                 response_time_ms = int((answer_time - creation_time).total_seconds() * 1000)
                 is_correct = (user_answer == correct_answer)
