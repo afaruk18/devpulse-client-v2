@@ -1,5 +1,5 @@
 from devpulse_client.config.tracker_config import tracker_settings
-from devpulse_client.core import ActivityStateTask, HeartbeatTask, ScreenshotCapturer, WindowTrackerTask
+from devpulse_client.core import ActivityStateTask, HeartbeatTask, ScreenshotCapturer, WindowTrackerTask, CaptchaTask
 from devpulse_client.queue.event_store import EventStore
 from devpulse_client.tables.activity_table import ActivityEventType
 from datetime import datetime
@@ -26,6 +26,15 @@ class ActivityTracker:
             WindowTrackerTask(interval=tracker_settings.WINDOW_EVENT_INTERVAL),
             ActivityStateTask(),
         ]
+        
+        # Add captcha task if enabled
+        if tracker_settings.CAPTCHA_INTERVAL > 0:
+            self.tasks.append(
+                CaptchaTask(
+                    interval=tracker_settings.CAPTCHA_INTERVAL,
+                    info_timeout=tracker_settings.CAPTCHA_INFO_TIMEOUT
+                )
+            )
         self.ingest_endpoint = "/api/ingest/events"
 
     def run(self) -> None:
